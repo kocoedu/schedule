@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>프리랜서 강사 AI 루틴 플래너</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .badge-pulse {
+      animation: pulseGlow 2s infinite;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen selection:bg-indigo-500 selection:text-white">
+
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <header class="flex flex-col md:flex-row md:items-center justify-between pb-6 mb-8 border-b border-slate-800 gap-4">
+      <div>
+        <div class="flex items-center space-x-2">
+          <span class="inline-flex items-center justify-center p-2 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-xl text-white shadow-lg shadow-indigo-500/20">
+            <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+          </span>
+          <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800">
+            Gemini Flash Multimodal Brain
+          </span>
+        </div>
+        <h1 class="text-2xl md:text-3xl font-extrabold text-white mt-2 tracking-tight">
+          프리랜서 강사 <span class="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-violet-300">맞춤 루틴 플래너</span>
+        </h1>
+        <p class="text-slate-400 text-xs md:text-sm mt-1">
+          들쑥날쑥한 강의 스케줄 사이로 비는 시간을 감지해 공부·강의준비·운동·이동을 최적으로 다시 배치합니다.
+        </p>
+      </div>
+
+      <!-- Quick Stats / Status -->
+      <div class="flex items-center space-x-2 bg-slate-800/80 border border-slate-700/80 px-4 py-2 rounded-xl text-xs text-slate-300 self-start md:self-auto backdrop-blur-sm">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 badge-pulse"></span>
+        <span id="apiStatusBadge">캔버스 실시간 AI 연결됨</span>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      
+      <!-- Left Column: Input Form (5 cols) -->
+      <div class="lg:col-span-5 space-y-6">
+        <div class="bg-slate-800/90 rounded-2xl p-6 border border-slate-700/70 shadow-xl backdrop-blur-sm">
+          <div class="flex items-center justify-between mb-5">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <i class="fa-regular fa-calendar-check text-indigo-400"></i> 오늘의 조건 입력
+            </h2>
+            <button type="button" id="loadPresetBtn" class="text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-4 transition">
+              예시 불러오기
+            </button>
+          </div>
+
+          <form id="routineForm" class="space-y-4">
+            <!-- Wake / Sleep time -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                <span><i class="fa-regular fa-clock mr-1 text-slate-400"></i> 활동 가능 시간대</span>
+                <span class="text-[11px] text-slate-400">기상 ~ 취침</span>
+              </label>
+              <input type="text" id="wakeSleepTime" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" value="07:30 - 23:30" placeholder="예: 07:00 - 24:00" required>
+            </div>
+
+            <!-- Fixed Schedule -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                <span><i class="fa-solid fa-chalkboard-user mr-1 text-amber-400"></i> 고정 일정 (강의/미팅/컨설팅)</span>
+                <span class="text-[11px] text-amber-400 font-normal">시간·장소 필수</span>
+              </label>
+              <textarea id="fixedSchedules" rows="3" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" placeholder="예: 13:30 - 16:30 판교 테크노밸리 오프라인 강의&#10;19:30 - 21:00 줌 온라인 라이브 코칭" required>14:00 - 17:00 강남 파이낸스센터 오프라인 직무 특강
+20:00 - 21:30 줌 온라인 수강생 1:1 Q&A</textarea>
+            </div>
+
+            <!-- Priorities & Self Routine -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                <span><i class="fa-solid fa-dumbbell mr-1 text-rose-400"></i> 꼭 챙기고 싶은 개인 루틴</span>
+                <span class="text-[11px] text-slate-400">우선순위</span>
+              </label>
+              <textarea id="priorities" rows="3" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" placeholder="공부, 강의준비, 운동 등">교재 실습 예제 코드 검증 (1.5시간)
+헬스장 하체 근력 운동 (40분)
+AI 최신 트렌드 논문/아티클 읽기 (45분)</textarea>
+            </div>
+
+            <!-- Special note / Condition -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5">
+                <i class="fa-regular fa-comment-dots mr-1 text-violet-400"></i> 컨디션 및 기타 메모
+              </label>
+              <input type="text" id="notes" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" value="강의 전후 목 피로도 주의, 대중교통 이동 중엔 팟캐스트 청취">
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" id="submitBtn" class="w-full mt-2 py-3 px-4 rounded-xl font-bold text-sm bg-gradient-to-r from-indigo-500 via-indigo-600 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center space-x-2 group">
+              <i class="fa-solid fa-arrows-rotate group-hover:rotate-180 transition-transform duration-500"></i>
+              <span id="btnText">AI 맞춤 루틴 재배치하기</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Routine Category Helper Chips -->
+        <div class="bg-slate-800/40 rounded-xl p-4 border border-slate-800 text-xs text-slate-400 flex flex-wrap gap-2 items-center">
+          <span class="font-semibold text-slate-300 mr-1"><i class="fa-solid fa-layer-group text-slate-400"></i> 자동 분류:</span>
+          <span class="px-2 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium">강의</span>
+          <span class="px-2 py-1 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-medium">강의준비</span>
+          <span class="px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium">공부</span>
+          <span class="px-2 py-1 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-medium">운동</span>
+          <span class="px-2 py-1 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-medium">이동</span>
+          <span class="px-2 py-1 rounded bg-slate-700/60 text-slate-300 border border-slate-600/40 font-medium">휴식/식사</span>
+        </div>
+      </div>
+
+      <!-- Right Column: Interactive Timeline View (7 cols) -->
+      <div class="lg:col-span-7">
+        <div class="bg-slate-800/90 rounded-2xl p-6 border border-slate-700/70 shadow-xl backdrop-blur-sm min-h-[560px] flex flex-col">
+          
+          <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-700">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-timeline text-indigo-400"></i> 최적화된 하루 타임라인
+            </h2>
+            <div id="exportBtnGroup" class="hidden flex items-center space-x-2">
+              <button id="copySummaryBtn" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 transition flex items-center gap-1.5">
+                <i class="fa-regular fa-copy"></i> 텍스트 복사
+              </button>
+            </div>
+          </div>
+
+          <!-- Loading View -->
+          <div id="loadingView" class="hidden flex-1 flex flex-col items-center justify-center py-20 text-center">
+            <div class="relative w-16 h-16 mb-4">
+              <div class="absolute inset-0 rounded-full border-4 border-indigo-500/20"></div>
+              <div class="absolute inset-0 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin"></div>
+            </div>
+            <p class="text-sm font-semibold text-slate-200">Gemini 3 Flash 모델이 일정을 다각도로 계산 중...</p>
+            <p class="text-xs text-slate-400 mt-1.5 max-w-xs">강의 전 목 보호 시간, 이동 시 틈새 학습, 에너지 고갈 타이밍을 분석하고 있습니다.</p>
+          </div>
+
+          <!-- Empty Initial View -->
+          <div id="emptyView" class="flex-1 flex flex-col items-center justify-center py-20 text-center">
+            <div class="w-14 h-14 rounded-2xl bg-slate-800 flex items-center justify-center text-slate-600 text-2xl mb-3 border border-slate-700">
+              <i class="fa-regular fa-calendar-plus"></i>
+            </div>
+            <p class="text-sm font-medium text-slate-300">아직 생성된 플랜이 없습니다</p>
+            <p class="text-xs text-slate-500 mt-1 max-w-sm">
+              왼쪽의 고정 일정과 원하는 루틴을 확인한 뒤 <br><b>[AI 맞춤 루틴 재배치하기]</b> 버튼을 눌러보세요.
+            </p>
+          </div>
+
+          <!-- Content Output View -->
+          <div id="resultView" class="hidden flex-1 flex flex-col space-y-5">
+            
+            <!-- Daily Strategic Advice Card -->
+            <div class="p-4 rounded-xl bg-gradient-to-r from-indigo-950/70 via-slate-900/80 to-purple-950/70 border border-indigo-500/30">
+              <div class="flex items-start gap-3">
+                <div class="p-2 rounded-lg bg-indigo-500/20 text-indigo-400 mt-0.5">
+                  <i class="fa-solid fa-lightbulb"></i>
+                </div>
+                <div>
+                  <h3 class="text-xs font-bold uppercase tracking-wider text-indigo-300">오늘의 루틴 운용 전략</h3>
+                  <p id="routineSummary" class="text-sm text-slate-200 font-medium mt-1 leading-relaxed"></p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Timeline List -->
+            <div id="timelineContainer" class="relative pl-6 space-y-4 before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-700/80 custom-scrollbar overflow-y-auto max-h-[580px] pr-2">
+              <!-- Dynamically populated timeline cards -->
+            </div>
+
+          </div>
+
+          <!-- Notification Toast Box -->
+          <div id="toast" class="hidden fixed bottom-6 right-6 bg-slate-800 border border-slate-600 text-slate-100 text-xs px-4 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-2">
+            <i class="fa-solid fa-circle-check text-emerald-400"></i>
+            <span id="toastMsg">복사되었습니다.</span>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // Category Styles Map
+    const categoryConfig = {
+      '강의': {
+        border: 'border-amber-500/40',
+        bg: 'bg-amber-950/20',
+        badge: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+        icon: 'fa-solid fa-chalkboard-user text-amber-400',
+        dot: 'bg-amber-400'
+      },
+      '강의준비': {
+        border: 'border-blue-500/40',
+        bg: 'bg-blue-950/20',
+        badge: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+        icon: 'fa-solid fa-laptop-code text-blue-400',
+        dot: 'bg-blue-400'
+      },
+      '공부': {
+        border: 'border-emerald-500/40',
+        bg: 'bg-emerald-950/20',
+        badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+        icon: 'fa-solid fa-book-open-reader text-emerald-400',
+        dot: 'bg-emerald-400'
+      },
+      '운동': {
+        border: 'border-rose-500/40',
+        bg: 'bg-rose-950/20',
+        badge: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+        icon: 'fa-solid fa-dumbbell text-rose-400',
+        dot: 'bg-rose-400'
+      },
+      '이동': {
+        border: 'border-purple-500/40',
+        bg: 'bg-purple-950/20',
+        badge: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+        icon: 'fa-solid fa-route text-purple-400',
+        dot: 'bg-purple-400'
+      },
+      '휴식/식사': {
+        border: 'border-slate-600/40',
+        bg: 'bg-slate-800/40',
+        badge: 'bg-slate-700/60 text-slate-300 border-slate-600/40',
+        icon: 'fa-solid fa-mug-hot text-slate-400',
+        dot: 'bg-slate-400'
+      }
+    };
+
+    let latestGeneratedSchedule = null;
+
+    // UI Helper: Show Toast Notification
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      toastMsg.innerText = message;
+      
+      const icon = toast.querySelector('i');
+      if (isError) {
+        icon.className = 'fa-solid fa-circle-exclamation text-rose-400';
+      } else {
+        icon.className = 'fa-solid fa-circle-check text-emerald-400';
+      }
+
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3500);
+    }
+
+    // Sample Preset Loader
+    document.getElementById('loadPresetBtn').addEventListener('click', () => {
+      document.getElementById('wakeSleepTime').value = '07:00 - 24:00';
+      document.getElementById('fixedSchedules').value = 
+`10:30 - 12:30 성수동 스타트업 특강
+15:00 - 18:00 강남 기업 DX 워크숍
+21:00 - 22:00 온라인 북클럽 진행`;
+      document.getElementById('priorities').value = 
+`30분 가벼운 러닝/스트레칭
+오후 워크숍 실습 시나리오 최종 리허설 (1시간)
+생성형 AI 기술 뉴스레터 읽기 (40분)`;
+      document.getElementById('notes').value = '이동 시간이 꽤 길어 대중교통에서 가볍게 읽을 루틴 희망';
+      showToast('샘플 일정이 양식에 채워졌습니다.');
+    });
+
+    async function callGeminiPlanner(wakeSleepTime, fixedSchedules, priorities, notes) {
+      // 캔버스 런타임에서는 빈 문자열로 두면 자동 주입됩니다.
+      const apiKey = ""; 
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+      const systemPrompt = `
+당신은 프리랜서 강사, 코치, 1인 지식창업가를 위한 정상급 시간관리 및 생산성 컨설턴트입니다.
+불규칙한 강의 일정, 이동 피로, 멘탈 및 목소리 에너지 소진 등을 깊이 이해하고 있습니다.
+사용자가 제공한 고정 강의/미팅 사이에 '강의준비', '공부', '운동', '이동', '휴식/식사'를 가장 실현 가능하고 건강한 방식으로 재배치하세요.
+
+[필수 원칙]
+1. 고정 강의 전후 최소 30분의 여유(장비 세팅, 장소 이동, 목 풀기 버퍼)를 꼭 고려하세요.
+2. 장거리 이동 시에는 무리한 공부 대신 오디오북, 팟캐스트, 마인드 컨트롤 등 '틈새 팁'을 제공하세요.
+3. 강의 직후는 에너지가 고갈되므로 바로 힘든 작업을 넣지 말고 휴식이나 가벼운 걷기/식사를 배정하세요.
+4. 카테고리는 반드시 ["강의", "강의준비", "공부", "운동", "이동", "휴식/식사"] 중 하나여야 합니다.
+`;
+
+      const userQuery = `
+- 활동 시간(기상~취침): ${wakeSleepTime}
+- 고정 일정(강의/미팅):
+${fixedSchedules}
+
+- 꼭 넣고 싶은 개인 루틴(공부/강의준비/운동):
+${priorities}
+
+- 특이사항 및 컨디션 메모:
+${notes}
+
+위 조건에 맞춰 기상부터 취침까지 빈틈없고 현실적인 하루 타임라인을 구성해주세요.
+`;
+
+      const payload = {
+        contents: [
+          { parts: [{ text: userQuery }] }
+        ],
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
+        },
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              summary: {
+                type: "STRING",
+                description: "오늘 하루의 핵심 운영 전략 및 멘탈 관리 조언 한 문장"
+              },
+              schedule: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    time: { type: "STRING", description: "예: 08:30 - 09:30" },
+                    activity: { type: "STRING", description: "구체적 활동 내용" },
+                    category: {
+                      type: "STRING",
+                      enum: ["강의", "강의준비", "공부", "운동", "이동", "휴식/식사"]
+                    },
+                    tip: { type: "STRING", description: "해당 시간대를 지혜롭게 보내기 위한 실천 팁" }
+                  },
+                  required: ["time", "activity", "category", "tip"]
+                }
+              }
+            },
+            required: ["summary", "schedule"]
+          }
+        }
+      };
+
+      // Exponential Backoff Fetch
+      let retries = 3;
+      let delay = 1000;
+      for (let i = 0; i < retries; i++) {
+        try {
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            throw new Error(`API 호출 실패 (HTTP ${response.status})`);
+          }
+
+          const result = await response.json();
+          const candidate = result.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!candidate) {
+            throw new Error("Gemini 응답 내용이 비어있습니다.");
+          }
+
+          return JSON.parse(candidate);
+        } catch (err) {
+          if (i === retries - 1) throw err;
+          await new Promise(r => setTimeout(r, delay));
+          delay *= 2;
+        }
+      }
+    }
+
+    function renderTimeline(data) {
+      const summaryElem = document.getElementById('routineSummary');
+      const container = document.getElementById('timelineContainer');
+      const exportGroup = document.getElementById('exportBtnGroup');
+
+      summaryElem.innerText = data.summary;
+      container.innerHTML = '';
+
+      data.schedule.forEach((item, index) => {
+        const theme = categoryConfig[item.category] || categoryConfig['휴식/식사'];
+        
+        const card = document.createElement('div');
+        card.className = 'relative flex items-start space-x-3 group';
+
+        card.innerHTML = `
+          <!-- Timeline Indicator Dot -->
+          <div class="absolute -left-[27px] mt-2 w-3.5 h-3.5 rounded-full ${theme.dot} ring-4 ring-slate-900 transition-transform group-hover:scale-125"></div>
+
+          <!-- Card Body -->
+          <div class="flex-1 rounded-xl p-4 border ${theme.border} ${theme.bg} backdrop-blur-sm transition-all duration-200 hover:translate-x-1 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-bold text-slate-300 tracking-wide font-mono flex items-center gap-1.5">
+                <i class="fa-regular fa-clock text-slate-400"></i> ${item.time}
+              </span>
+              <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${theme.badge} flex items-center gap-1">
+                <i class="${theme.icon} text-[10px]"></i>
+                ${item.category}
+              </span>
+            </div>
+            
+            <h4 class="text-sm md:text-base font-semibold text-white tracking-tight">
+              ${item.activity}
+            </h4>
+
+            <div class="mt-2.5 text-xs text-slate-300/90 bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/50 flex items-start gap-2">
+              <i class="fa-solid fa-sparkles text-indigo-400 text-xs mt-0.5"></i>
+              <span class="leading-relaxed"><strong class="text-indigo-300">실천 팁:</strong> ${item.tip}</span>
+            </div>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+
+      exportGroup.classList.remove('hidden');
+    }
+
+    document.getElementById('routineForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const wakeSleepTime = document.getElementById('wakeSleepTime').value.trim();
+      const fixedSchedules = document.getElementById('fixedSchedules').value.trim();
+      const priorities = document.getElementById('priorities').value.trim();
+      const notes = document.getElementById('notes').value.trim();
+
+      const submitBtn = document.getElementById('submitBtn');
+      const btnText = document.getElementById('btnText');
+      const loadingView = document.getElementById('loadingView');
+      const emptyView = document.getElementById('emptyView');
+      const resultView = document.getElementById('resultView');
+
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
+      btnText.innerText = 'AI가 최적 루틴 계산 중...';
+      
+      emptyView.classList.add('hidden');
+      resultView.classList.add('hidden');
+      loadingView.classList.remove('hidden');
+
+      try {
+        const generatedData = await callGeminiPlanner(wakeSleepTime, fixedSchedules, priorities, notes);
+        latestGeneratedSchedule = generatedData;
+        renderTimeline(generatedData);
+        resultView.classList.remove('hidden');
+        showToast('일정이 성공적으로 최적화되었습니다!');
+      } catch (err) {
+        console.error(err);
+        emptyView.classList.remove('hidden');
+        showToast(`오류 발생: ${err.message || '일정을 재배치하지 못했습니다.'}`, true);
+      } finally {
+        loadingView.classList.add('hidden');
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+        btnText.innerText = 'AI 맞춤 루틴 재배치하기';
+      }
+    });
+
+    document.getElementById('copySummaryBtn').addEventListener('click', () => {
+      if (!latestGeneratedSchedule) return;
+
+      let textOutput = `[오늘의 AI 맞춤 루틴]\n전략: ${latestGeneratedSchedule.summary}\n\n`;
+      latestGeneratedSchedule.schedule.forEach(item => {
+        textOutput += `• ${item.time} [${item.category}] ${item.activity}\n  ↳ Tip: ${item.tip}\n`;
+      });
+
+      // iframe-safe copy
+      const tempTextArea = document.createElement('textarea');
+      tempTextArea.value = textOutput;
+      document.body.appendChild(tempTextArea);
+      tempTextArea.select();
+      try {
+        document.execCommand('copy');
+        showToast('전체 일정 텍스트가 클립보드에 복사되었습니다.');
+      } catch (e) {
+        showToast('복사에 실패했습니다.', true);
+      }
+      document.body.removeChild(tempTextArea);
+    });
+  </script>
+</body>
+</html>
