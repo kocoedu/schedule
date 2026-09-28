@@ -1,5 +1,4 @@
 module.exports = async function handler(req, res) {
-  // CORS 설정
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
@@ -16,11 +15,10 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // Vercel 환경변수에서 키를 읽어옵니다.
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.trim() === '') {
     return res.status(500).json({
-      error: 'Vercel에 GEMINI_API_KEY 환경변수가 설정되지 않았습니다. Settings -> Environment Variables를 확인해주세요.'
+      error: 'Vercel 환경변수 GEMINI_API_KEY가 비어있습니다. Settings에서 등록 후 재배포해주세요.'
     });
   }
 
@@ -44,8 +42,8 @@ module.exports = async function handler(req, res) {
 1. 반드시 순수한 JSON 형식으로만 응답하세요. 마크다운(\`\`\`)이나 추가 설명 문장은 절대 붙이지 마세요.
 2. category 필드는 반드시 다음 6가지 중 하나만 사용하세요: ["강의", "강의준비", "공부", "운동", "이동", "휴식/식사"]
 3. 강의 전후 이동 시간 및 현장 세팅/마무리 버퍼(최소 20~30분)를 반드시 확보하세요.
-4. 강의 직후는 에너지 소진이 크므로 뇌를 식힐 수 있는 휴식 또는 가벼운 스트레칭을 배치하세요.
-5. 높은 집중력이 필요한 작업(교재 연구, 심화 공부)은 비는 골든 타임에 배치하세요.
+4. 강의 직후는 휴식 또는 가벼운 스트레칭을 배치하세요.
+5. 높은 집중력이 필요한 작업은 비는 골든 타임에 배치하세요.
 
 [반환 JSON 규격]
 {
@@ -61,38 +59,70 @@ module.exports = async function handler(req, res) {
 }
 `;
 
-  // 사용자 계정 카탈로그에 존재하는 공식 최신 Flash 모델
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
+  const requestBody = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      responseMimeType: "application/json"
+    }
+  });
 
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json"
-        }
-      })
-    });
+  // 조회 목록에서 확인된 실제 유효 모델 3종 (가장 한산한 모델 순서로 배치)
+  const candidateModels = [
+    'gemini-3.5-flash-lite', // 트래픽 여유 + 경량
+    'gemini-3.6-flash',      // 안정형 Flash
+    'gemini-flash-latest'    // 기본 최신형
+  ];
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      return res.status(response.status).json({
-        error: errData.error?.message || `HTTP ${response.status} 오류 발생`
+  let lastErrorMsg = '';
+
+  for (let i = 0; i < candidateModels.length; i++) {
+    const model = candidateModels[i];
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody
       });
+
+      if (response.ok) {
+        const data = await response.json();
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!rawText) {
+          throw new Error('응답 내용이 비어 있습니다.');
+        }
+
+        const parsed = JSON.parse(rawText.replace(/```json|```/g, '').trim());
+        return res.status(200).json(parsed);
+      }
+
+      const errData = await response.json().catch(() => ({}));
+      const errMsg = errData.error?.message || `HTTP ${response.status}`;
+      lastErrorMsg = errMsg;
+
+      // High demand(과부하) 또는 429 감지 시 다음 후보 모델로 즉시 전환
+      const isBusy = errMsg.includes('high demand') || response.status === 429 || response.status === 503;
+      if (isBusy && i < candidateModels.length - 1) {
+        await new Promise((r) => setTimeout(r, 800));
+        continue;
+      }
+
+      // 키 오류(400/403) 등 구조적 문제는 즉시 반환
+      if (!isBusy) {
+        return res.status(response.status).json({ error: errMsg });
+      }
+    } catch (err) {
+      lastErrorMsg = err.message;
+      if (i < candidateModels.length - 1) {
+        await new Promise((r) => setTimeout(r, 600));
+        continue;
+      }
     }
-
-    const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawText) {
-      return res.status(500).json({ error: '모델 응답 본문이 비어 있습니다.' });
-    }
-
-    const parsed = JSON.parse(rawText.replace(/```json|```/g, '').trim());
-    return res.status(200).json(parsed);
-  } catch (err) {
-    return res.status(500).json({ error: err.message || '서버 처리 중 오류가 발생했습니다.' });
   }
+
+  return res.status(500).json({
+    error: `현재 구글 서버 트래픽이 일시적으로 집중되었습니다. 약 10초 뒤 다시 눌러주세요. (${lastErrorMsg})`
+  });
 };
